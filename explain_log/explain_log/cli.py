@@ -3,18 +3,19 @@ import sys
 import os
 
 from explain_log.parser import preprocess, EmptyLogError
-from explain_log.ai     import analyze, APIError, RateLimitError
+from explain_log.ai import analyze, APIError, RateLimitError
 
 try:
     from rich.console import Console
-    from rich.panel   import Panel
-    from rich.text    import Text
+    from rich.panel import Panel
+    from rich.text import Text
     RICH_AVAILABLE = True
 except ImportError:
     RICH_AVAILABLE = False
 
 
-console = Console(stderr=True)   # progress/errors → stderr, clean stdout for --format json
+# progress/errors → stderr, clean stdout for --format json
+console = Console(stderr=True)
 
 
 # ── entry point ───────────────────────────────────────────────────────────────
@@ -33,16 +34,16 @@ def main():
     # ── parse ─────────────────────────────────────────────────────────────────
     try:
         parsed = preprocess(
-            raw_text   = raw,
-            last_n     = args.last,
-            max_tokens = 3000,
+            raw_text=raw,
+            last_n=args.last,
+            max_tokens=3000,
         )
     except EmptyLogError as e:
         _die(str(e))
 
     # override auto-detected log type if user passed --log-type
     if args.log_type:
-        parsed["log_type"] = args.log_type 
+        parsed["log_type"] = args.log_type
 
     # ── show parse summary on stderr so user knows what's being sent ──────────
     if not args.quiet:
@@ -79,10 +80,9 @@ def main():
             print(md)
 
     else:  # terminal (default)
-        if RICH_AVAILABLE:
-            _render_rich(result, parsed)
-        else:
-            _render_plain(result, parsed)
+        from explain_log.formatter import render
+
+        render(result, fmt="terminal")
         if args.save:
             _save_file(args.save, _render_markdown(result, parsed))
             console.print(f"[dim]  saved →[/dim] {args.save}")
@@ -92,9 +92,9 @@ def main():
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog        = "explain-log",
-        description = "Pipe any log into this tool and get an AI-powered diagnosis.",
-        epilog      = (
+        prog="explain-log",
+        description="Pipe any log into this tool and get an AI-powered diagnosis.",
+        epilog=(
             "examples:\n"
             "  cat /var/log/syslog | explain-log\n"
             "  explain-log --file nginx.log\n"
@@ -102,54 +102,55 @@ def _build_parser() -> argparse.ArgumentParser:
             "  explain-log --file app.log --format json | jq\n"
             "  explain-log --file crash.log --save report.md"
         ),
-        formatter_class = argparse.RawDescriptionHelpFormatter,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
     # input
     input_group = p.add_mutually_exclusive_group()
     input_group.add_argument(
         "--file", "-f",
-        metavar = "PATH",
-        help    = "path to log file (default: read from stdin)",
+        metavar="PATH",
+        help="path to log file (default: read from stdin)",
     )
 
     # filtering
     p.add_argument(
         "--last", "-n",
-        type    = int,
-        metavar = "N",
-        help    = "only analyze the last N lines",
+        type=int,
+        metavar="N",
+        help="only analyze the last N lines",
     )
     p.add_argument(
         "--log-type",
-        metavar = "TYPE",
-        choices = ["nginx", "systemd", "python", "kernel", "apache", "postgres", "ssh", "docker", "unknown"],
-        help    = "override auto-detected log type (hint sent to AI)",
+        metavar="TYPE",
+        choices=["nginx", "systemd", "python", "kernel",
+                 "apache", "postgres", "ssh", "docker", "unknown"],
+        help="override auto-detected log type (hint sent to AI)",
     )
 
     # output
     p.add_argument(
         "--format",
-        default = "terminal",
-        choices = ["terminal", "json", "markdown"],
-        help    = "output format (default: terminal)",
+        default="terminal",
+        choices=["terminal", "json", "markdown"],
+        help="output format (default: terminal)",
     )
     p.add_argument(
         "--save", "-o",
-        metavar = "PATH",
-        help    = "save markdown report to file (works with any --format)",
+        metavar="PATH",
+        help="save markdown report to file (works with any --format)",
     )
 
     # behaviour
     p.add_argument(
         "--no-stream",
-        action  = "store_true",
-        help    = "disable streaming (wait for full response before printing)",
+        action="store_true",
+        help="disable streaming (wait for full response before printing)",
     )
     p.add_argument(
         "--quiet", "-q",
-        action  = "store_true",
-        help    = "suppress progress output on stderr",
+        action="store_true",
+        help="suppress progress output on stderr",
     )
 
     return p
@@ -181,9 +182,10 @@ _SEVERITY_COLOR = {
     "info":     "green",
 }
 
+
 def _render_rich(result: dict, parsed: dict):
     severity = result["severity"]
-    color    = _SEVERITY_COLOR.get(severity, "white")
+    color = _SEVERITY_COLOR.get(severity, "white")
 
     title = Text()
     title.append("● ", style=f"bold {color}")
@@ -201,7 +203,8 @@ def _render_rich(result: dict, parsed: dict):
             body.append(fix + "\n", style="white")
 
     console_out = Console()   # stdout console for the actual result
-    console_out.print(Panel(body, title=title, border_style=color, padding=(1, 2)))
+    console_out.print(
+        Panel(body, title=title, border_style=color, padding=(1, 2)))
 
 
 def _render_plain(result: dict, parsed: dict):
