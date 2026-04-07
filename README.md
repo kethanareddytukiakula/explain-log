@@ -10,6 +10,7 @@ A CLI tool that takes system or application logs as input and outputs a clear di
 ```bash
 git clone https://github.com/Ahamed-2008/explain-log.git
 cd explain-log
+cd explain_log
 ```
 
 ### 2. Create a virtual environment
